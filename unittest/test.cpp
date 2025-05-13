@@ -118,3 +118,58 @@ TEST_F(RPCTest, ReturnVoidTest)
 
 	server.unbind("trigger");
 }
+
+TEST_F(RPCTest, MultiCallTest)
+{
+	int count = 0;
+
+	server.bind("trigger", [&](int delta) -> int {
+		count += delta;
+
+		return count;
+	});
+
+	auto [fut, buff] = client.multi_call<int>("trigger", 3);
+
+	auto respBuff1 = server.handle_call(buff);
+	auto respBuff2 = server.handle_call(buff);
+	auto respBuff3 = server.handle_call(buff);
+
+	client.ingest_resp(respBuff1, false);
+	EXPECT_EQ(fut.wait_for(0s), std::future_status::timeout);
+
+	client.ingest_resp(respBuff2, false);
+	EXPECT_EQ(fut.wait_for(0s), std::future_status::timeout);
+
+	client.ingest_resp(respBuff3, true/*last*/);
+	EXPECT_EQ(fut.wait_for(0s), std::future_status::ready);
+
+	std::vector<int> refVec{3, 6, 9};
+	EXPECT_EQ(fut.get(), refVec);
+
+	server.unbind("trigger");
+}
+
+TEST_F(RPCTest, ReturnVoidMultiCallTest)
+{
+	int count = 0;
+
+	server.bind("trigger", [&](int delta) {
+		count += delta;
+	});
+
+	auto [fut, buff] = client.multi_call<void>("trigger", 3);
+
+	EXPECT_EQ(fut.wait_for(0s), std::future_status::ready);
+
+	auto respBuff1 = server.handle_call(buff);
+	auto respBuff2 = server.handle_call(buff);
+	auto respBuff3 = server.handle_call(buff);
+
+	EXPECT_EQ(respBuff1.size(), 0UL);
+	EXPECT_EQ(respBuff2.size(), 0UL);
+	EXPECT_EQ(respBuff3.size(), 0UL);
+	EXPECT_EQ(count, 9);
+
+	server.unbind("trigger");
+}

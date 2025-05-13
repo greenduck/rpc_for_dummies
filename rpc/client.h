@@ -44,7 +44,7 @@ public:
 		} else {
 			std::lock_guard lock(m_mutex);
 
-			auto wrapper = [=](const msgpack::object& obj) noexcept {
+			auto wrapper = [=](const msgpack::object& obj, [[maybe_unused]] bool last) noexcept {
 				auto resp = obj.as<R>();
 
 				prom->set_value(std::move(resp));
@@ -58,7 +58,43 @@ public:
 		return std::make_tuple(prom->get_future(), std::move(data));
 	}
 
-	void ingest_resp(const msgpack::sbuffer& buffer)
+
+	template <typename R, typename... Args>
+	auto multi_call(const std::string& funcID, Args&&... args)
+	{
+		auto data = serialize_call(m_callID, funcID, std::forward<Args>(args)...);
+
+		if constexpr (std::is_same_v<R, void>) {
+			/* no return value, do not wait */
+			auto prom = std::make_shared<std::promise<R>>();
+
+			prom->set_value();
+			++m_callID;
+			return std::make_tuple(prom->get_future(), std::move(data));
+		} else {
+			auto prom = std::make_shared<std::promise<std::vector<R>>>();
+			auto retval = std::make_shared<std::vector<R>>();
+
+			std::lock_guard lock(m_mutex);
+
+			auto wrapper = [=](const msgpack::object& obj, bool last) noexcept {
+				auto resp = obj.as<R>();
+				retval->push_back(std::move(resp));
+
+				if (last) {
+					prom->set_value(std::move(*retval));
+				}
+			};
+
+			/* FIXME: need timeout */
+			m_respWaiters.emplace(m_callID, wrapper);
+			++m_callID;
+			return std::make_tuple(prom->get_future(), std::move(data));
+		}
+	}
+
+
+	void ingest_resp(const msgpack::sbuffer& buffer, bool last = true)
 	{
 		std::vector<msgpack::object> items;
 
@@ -68,7 +104,7 @@ public:
 			throw std::runtime_error("malformed response buffer");
 
 		auto callID = items[0].as<uint32_t>();
-		std::function<void(const msgpack::object&)> wrapper;
+		std::function<void(const msgpack::object&, bool)> wrapper;
 
 		{
 			std::lock_guard lock(m_mutex);
@@ -77,16 +113,20 @@ public:
 			if (it == m_respWaiters.end())
 				throw std::runtime_error("unexpected callID on return: " + callID);
 
-			wrapper = std::move(it->second);
-			m_respWaiters.erase(it);
+			if (last) {
+				wrapper = std::move(it->second);
+				m_respWaiters.erase(it);
+			} else {
+				wrapper = it->second;
+			}
 		}
 
-		wrapper(items[1]);
+		wrapper(items[1], last);
 	}
 
 private:
 	std::atomic<uint32_t> m_callID = 122333;
-	std::unordered_map<uint32_t, std::function<void(const msgpack::object&)>> m_respWaiters;
+	std::unordered_map<uint32_t, std::function<void(const msgpack::object&, bool)>> m_respWaiters;
 	std::mutex m_mutex;
 };
 
