@@ -10,6 +10,7 @@ set(CMAKE_CXX_FLAGS_RELEASE	"-O2")
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 option(WITH_STANDALONE_TEST "Build unittests into standalone binary" OFF)
+option(WITH_TRANSPORT_TEST "Build transport test(s) into standalone binary" OFF)
 
 set(MSGPACK_TAG cpp-7.0.0)
 set(GTEST_VERSION 1.14.0)
@@ -83,3 +84,17 @@ if(WITH_STANDALONE_TEST)
 	target_link_libraries(unittest PRIVATE gtest gtest_main "${rpc_unittest_LINK_LIB}")
 endif()
 
+if(WITH_TRANSPORT_TEST)
+	message(STATUS "== rpc: Build transport test")
+	file(GLOB transport_test_files ${CMAKE_CURRENT_SOURCE_DIR}/transport/socket/*.cpp)
+	add_executable(transport_test ${transport_test_files})
+	target_include_directories(transport_test
+		PUBLIC
+		  "${CMAKE_CURRENT_SOURCE_DIR}/rpc"
+		  "${msgpack_SOURCE_DIR}/include"
+	)
+	target_link_libraries(transport_test
+		PRIVATE
+		  msgpack-cxx
+	)
+endif()
