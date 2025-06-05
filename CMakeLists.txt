@@ -96,5 +96,6 @@ if(WITH_TRANSPORT_TEST)
 	target_link_libraries(transport_test
 		PRIVATE
 		  msgpack-cxx
+		  pthread
 	)
 endif()

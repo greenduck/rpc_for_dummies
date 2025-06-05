@@ -52,8 +52,9 @@ protected:
 
 TEST_F(RPCTest, ArithTest)
 {
-	auto [fut1, buff1] = client.call<double>("add", 90, 21);
-	auto [fut2, buff2] = client.call<double>("sub", 123, 12);
+	auto [fut1, buff1, id1] = client.call<double>("add", 90, 21);
+	auto [fut2, buff2, id2] = client.call<double>("sub", 123, 12);
+	ASSERT_GT(id2, id1);
 
 	auto respBuff1 = server.handle_call(buff1);
 	auto respBuff2 = server.handle_call(buff2);
@@ -66,7 +67,7 @@ TEST_F(RPCTest, ArithTest)
 
 TEST_F(RPCTest, DivisionByZeroTest)
 {
-	auto [fut, buff] = client.call<std::tuple<bool, double>>("div", 24, 0);
+	auto [fut, buff, _] = client.call<std::tuple<bool, double>>("div", 24, 0);
 
 	auto respBuff = server.handle_call(buff);
 
@@ -78,7 +79,7 @@ TEST_F(RPCTest, DivisionByZeroTest)
 
 TEST_F(RPCTest, DivisionValidTest)
 {
-	auto [fut, buff] = client.call<std::tuple<bool, double>>("div", 24, 3);
+	auto [fut, buff, _] = client.call<std::tuple<bool, double>>("div", 24, 3);
 
 	auto respBuff = server.handle_call(buff);
 
@@ -90,7 +91,7 @@ TEST_F(RPCTest, DivisionValidTest)
 
 TEST_F(RPCTest, ZeroFunctionTest)
 {
-	auto [fut, buff] = client.call<double>("zero");
+	auto [fut, buff, _] = client.call<double>("zero");
 
 	auto respBuff = server.handle_call(buff);
 
@@ -100,7 +101,7 @@ TEST_F(RPCTest, ZeroFunctionTest)
 
 TEST_F(RPCTest, ReturnVoidTest)
 {
-	auto [fut, buff] = client.call<void>("trigger", 3);
+	auto [fut, buff, _] = client.call<void>("trigger", 3);
 
 	auto status = fut.wait_for(0s);
 	EXPECT_EQ(status, std::future_status::ready);
@@ -129,7 +130,7 @@ TEST_F(RPCTest, MultiCallTest)
 		return count;
 	});
 
-	auto [fut, buff] = client.multi_call<int>("trigger", 3);
+	auto [fut, buff, _] = client.multi_call<int>("trigger", 3);
 
 	auto respBuff1 = server.handle_call(buff);
 	auto respBuff2 = server.handle_call(buff);
@@ -158,7 +159,7 @@ TEST_F(RPCTest, ReturnVoidMultiCallTest)
 		count += delta;
 	});
 
-	auto [fut, buff] = client.multi_call<void>("trigger", 3);
+	auto [fut, buff, _] = client.multi_call<void>("trigger", 3);
 
 	EXPECT_EQ(fut.wait_for(0s), std::future_status::ready);
 
@@ -172,4 +173,23 @@ TEST_F(RPCTest, ReturnVoidMultiCallTest)
 	EXPECT_EQ(count, 9);
 
 	server.unbind("trigger");
+}
+
+TEST_F(RPCTest, CancellationTest)
+{
+	auto [fut1, buff1, id1] = client.call<double>("add", 90, 21);
+	auto [fut2, buff2, id2] = client.call<double>("sub", 123, 12);
+	ASSERT_GT(id2, id1);
+
+	auto respBuff1 = server.handle_call(buff1);
+	auto respBuff2 = server.handle_call(buff2);
+
+	/* can be invoked, e.g. upon timeout */
+	client.cancel(id1, std::runtime_error("test cancellation"));
+
+	EXPECT_THROW(client.ingest_resp(respBuff1), std::runtime_error);
+	EXPECT_NO_THROW(client.ingest_resp(respBuff2));
+
+	EXPECT_THROW(fut1.get(), std::runtime_error);
+	EXPECT_EQ(fut2.get(), 111);
 }

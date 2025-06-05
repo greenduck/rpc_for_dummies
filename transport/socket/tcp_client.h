@@ -12,6 +12,8 @@
 
 #include <unistd.h>
 
+#include <thread>
+
 
 namespace rpc {
 
@@ -29,20 +31,31 @@ public:
 	template <typename R, typename... Args>
 	R call(const std::string& funcID, Args&&... args)
 	{
-		auto [future, buffer] = m_client.call<R>(funcID, std::forward<Args>(args)...);
-		tcp::send_buffer(m_sock, buffer.data(), buffer.size());
+		auto [future, buffer, id] = m_client.call<R>(funcID, std::forward<Args>(args)...);
 
-		if constexpr (std::is_same_v<R, void>) {
-			/* no return value, do not wait */
-			return;
-		}
+		auto transaction = std::async(std::launch::async, [&] {
+			tcp::send_buffer(m_sock, buffer.data(), buffer.size());
 
-		auto respBuffer = tcp::recv_buffer(m_sock);
+			if constexpr (std::is_same_v<R, void>) {
+				/* no return value, do not wait */
+				return;
+			}
 
-		msgpack::sbuffer resp;
-		resp.write(respBuffer.data(), respBuffer.size());
+			auto respBuffer = tcp::recv_buffer(m_sock);
+			if (respBuffer.empty()) {
+				m_client.cancel(id, std::runtime_error("client: no response"));
+				return;
+			}
 
-		m_client.ingest_resp(resp);
+			try {
+				msgpack::sbuffer resp;
+				resp.write(respBuffer.data(), respBuffer.size());
+				m_client.ingest_resp(resp, true/*last*/);
+			} catch (...) {
+				m_client.cancel(id, std::move(std::current_exception()));
+			}
+		});
+
 		return future.get();
 	}
 
