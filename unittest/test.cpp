@@ -185,11 +185,11 @@ TEST_F(RPCTest, CancellationTest)
 	auto respBuff2 = server.handle_call(buff2);
 
 	/* can be invoked, e.g. upon timeout */
-	client.cancel(id1, std::runtime_error("test cancellation"));
+	client.cancel(id1, std::underflow_error("test cancellation"));
 
-	EXPECT_THROW(client.ingest_resp(respBuff1), std::runtime_error);
+	EXPECT_THROW(client.ingest_resp(respBuff1), rpc::ClientError);
 	EXPECT_NO_THROW(client.ingest_resp(respBuff2));
 
-	EXPECT_THROW(fut1.get(), std::runtime_error);
+	EXPECT_THROW(fut1.get(), std::underflow_error);
 	EXPECT_EQ(fut2.get(), 111);
 }

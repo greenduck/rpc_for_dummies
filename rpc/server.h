@@ -7,6 +7,8 @@
 
 #pragma once
 
+#include "errors.h"
+
 #include "msgpack.hpp"
 
 #include <shared_mutex>
@@ -56,6 +58,18 @@ public:
 
 
 namespace rpc {
+
+class ServerError : public error {
+public:
+	explicit ServerError(const std::string& msg) noexcept
+		: error(msg)
+	{ }
+
+	explicit ServerError(const char* msg) noexcept
+		: error(msg)
+	{ }
+};
+
 
 class Server {
 public:
@@ -111,7 +125,7 @@ public:
 		auto callback = m_callbacks.find(funcID);
 
 		if (callback == m_callbacks.end())
-			throw std::runtime_error("unregistered function: " + funcID);
+			throw ServerError("unregistered function: " + funcID);
 
 		/* FIXME: handle exceptions */
 		return callback->second(callID, buffer);

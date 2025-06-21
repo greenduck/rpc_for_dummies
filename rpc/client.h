@@ -7,6 +7,8 @@
 
 #pragma once
 
+#include "errors.h"
+
 #include "msgpack.hpp"
 
 #include <unordered_map>
@@ -16,6 +18,18 @@
 
 
 namespace rpc {
+
+class ClientError : public error {
+public:
+	explicit ClientError(const std::string& msg) noexcept
+		: error(msg)
+	{ }
+
+	explicit ClientError(const char* msg) noexcept
+		: error(msg)
+	{ }
+};
+
 
 template <typename... Args>
 msgpack::sbuffer serialize_call(uint32_t callID, const std::string& funcID, Args&&... args)
@@ -136,7 +150,7 @@ public:
 		msgpack::unpack(buffer.data(), buffer.size()).get().convert(items);
 
 		if (items.size() != 2)
-			throw std::runtime_error("malformed response buffer");
+			throw ClientError("malformed response buffer");
 
 		auto callID = items[0].as<uint32_t>();
 		std::function<void(const msgpack::object&, bool, std::exception_ptr&&)> wrapper;
@@ -146,7 +160,7 @@ public:
 			auto it = m_respWaiters.find(callID);
 
 			if (it == m_respWaiters.end())
-				throw std::runtime_error("unexpected callID on return: " + callID);
+				throw ClientError("unexpected callID on return: " + callID);
 
 			if (last) {
 				wrapper = std::move(it->second);
