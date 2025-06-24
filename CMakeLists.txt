@@ -98,4 +98,18 @@ if(WITH_TRANSPORT_TEST)
 		  msgpack-cxx
 		  pthread
 	)
+
+
+	file(GLOB null_test_files ${CMAKE_CURRENT_SOURCE_DIR}/transport/null/*.cpp)
+	add_executable(null_test ${null_test_files})
+	target_include_directories(null_test
+		PUBLIC
+		  "${CMAKE_CURRENT_SOURCE_DIR}"
+		  "${msgpack_SOURCE_DIR}/include"
+	)
+	target_link_libraries(null_test
+		PRIVATE
+		  msgpack-cxx
+		  pthread
+	)
 endif()
