@@ -31,6 +31,6 @@ $ cmake -DWITH_STANDALONE_TEST=ON -DWITH_TRANSPORT_TEST=ON ../
 $ make
 $ ls -l
 ...
-transport_test
+tcp_test
 unittest
 ```
