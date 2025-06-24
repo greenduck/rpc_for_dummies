@@ -8,7 +8,7 @@
 
 #pragma once
 
-#include "client.h"
+#include "rpc/client.h"
 #include "utils.h"
 
 #include <unistd.h>

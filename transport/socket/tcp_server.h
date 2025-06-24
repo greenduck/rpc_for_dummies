@@ -7,7 +7,7 @@
 
 #pragma once
 
-#include "server.h"
+#include "rpc/server.h"
 #include "utils.h"
 
 #include <unistd.h>

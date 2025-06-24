@@ -90,7 +90,7 @@ if(WITH_TRANSPORT_TEST)
 	add_executable(transport_test ${transport_test_files})
 	target_include_directories(transport_test
 		PUBLIC
-		  "${CMAKE_CURRENT_SOURCE_DIR}/rpc"
+		  "${CMAKE_CURRENT_SOURCE_DIR}"
 		  "${msgpack_SOURCE_DIR}/include"
 	)
 	target_link_libraries(transport_test
