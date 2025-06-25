@@ -15,6 +15,7 @@
 #include <future>
 #include <mutex>
 #include <atomic>
+#include <ctime>
 
 
 namespace rpc {
@@ -160,7 +161,7 @@ public:
 			auto it = m_respWaiters.find(callID);
 
 			if (it == m_respWaiters.end())
-				throw ClientError("unexpected callID on return: " + callID);
+				throw ClientError("unexpected callID on return: " + std::to_string(callID));
 
 			if (last) {
 				wrapper = std::move(it->second);
@@ -174,7 +175,7 @@ public:
 	}
 
 private:
-	std::atomic<uint32_t> m_callID = 122333;
+	std::atomic<uint32_t> m_callID{static_cast<uint32_t>(std::time(nullptr))};
 	std::unordered_map<uint32_t, std::function<void(const msgpack::object&, bool, std::exception_ptr&&)>> m_respWaiters;
 	std::mutex m_mutex;
 };
